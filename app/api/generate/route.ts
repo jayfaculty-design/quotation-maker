@@ -1,4 +1,3 @@
-// src/app/api/generate/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
@@ -14,19 +13,62 @@ export async function POST(req: NextRequest) {
 
     const totalInWords = convertAmountToWords(financials.grandTotal);
 
+    const ordinalSuffix = (num: number) => {
+      const s = ["th", "st", "nd", "rd"],
+        v = num % 100;
+      return s[(v - 20) % 10] || s[v] || s[0];
+    };
+    const d = new Date(metadata.date);
+    const day = d.getDate();
+    const upper = (s: string) => (s ?? "").toUpperCase();
+
+    function toTitleCase(s: string): string {
+      const minor = new Set([
+        "of",
+        "and",
+        "the",
+        "for",
+        "to",
+        "in",
+        "on",
+        "a",
+        "an",
+        "or",
+        "with",
+        "at",
+        "by",
+      ]);
+      const words = (s ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+      return words
+        .map((w, i) =>
+          i !== 0 && i !== words.length - 1 && minor.has(w)
+            ? w
+            : w.charAt(0).toUpperCase() + w.slice(1),
+        )
+        .join(" ");
+    }
+
     const templateData = {
       hospitalName: metadata.hospitalName,
       hospitalAddress: metadata.hospitalAddress,
       sqNumber: metadata.sqNumber,
       tenderTitle: metadata.title,
-      date: new Date(metadata.date).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }),
+      dateDay: day,
+      dateMonthUpper: d
+        .toLocaleDateString("en-US", { month: "long" })
+        .toUpperCase(),
+      daySuffix: ordinalSuffix(day),
+      dateMonth: d.toLocaleDateString("en-US", { month: "long" }),
+      dateYear: d.getFullYear(),
       deliveryTerms: metadata.deliveryTerms,
       validityTerms: metadata.validityTerms,
       paymentTerms: metadata.paymentTerms,
+      itemNameUpper: upper(metadata.itemName),
+      itemNameTitle: toTitleCase(metadata.itemName),
+      titleUpper: upper(metadata.title),
+      titleTitle: toTitleCase(metadata.title),
+      quantitySummary:
+        items.length > 1 ? "VARIOUS" : String(items[0]?.qty ?? ""),
 
       // Adjusted casing to match your template's {{subTotal}}
       subTotal: financials.subtotal.toLocaleString("en-US", {
@@ -41,7 +83,7 @@ export async function POST(req: NextRequest) {
       grandTotalWords: totalInWords,
 
       lineItems: items.map((item: any, idx: number) => ({
-        nums: idx + 1, // Adjusted to match your template's {{nums}}
+        nums: idx + 1,
         description: item.description,
         uom: item.uom,
         qty: item.qty,

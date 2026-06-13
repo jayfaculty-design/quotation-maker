@@ -1,7 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, FileDown, Loader2, FileText } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  FileDown,
+  Loader2,
+  FileText,
+  ChevronDown,
+} from "lucide-react";
+import { useHospitals } from "@/lib/useHospitals";
+import { usePersistentState } from "@/lib/usePersistentState";
 
 interface LineItem {
   id: string;
@@ -19,7 +28,7 @@ interface TaxRate {
   enabled: boolean;
 }
 
-/* shared styling tokens */
+/* ---------- shared styling tokens ---------- */
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/15";
 const labelClass =
@@ -35,7 +44,9 @@ const PACKAGE_DOCS = [
   "Sub Tittles",
 ];
 
-/* small presentational helpers */
+const ADD_NEW = "__add__";
+
+/* ---------- small presentational helpers ---------- */
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="mb-4 flex items-center gap-2">
@@ -65,23 +76,32 @@ function Field({
 export default function BidWorkspace() {
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Template Variables Form Setup
-  const [metadata, setMetadata] = useState({
+  // Hospital list (seed + saved) and add helper
+  const { hospitals, addHospital } = useHospitals();
+  const [selectedHospitalId, setSelectedHospitalId] = usePersistentState(
+    "bc-bid-hospital",
+    "ugmc",
+  );
+  const [isAddingHospital, setIsAddingHospital] = useState(false);
+
+  // 1. Template Variables Form Setup
+  const [metadata, setMetadata] = usePersistentState("bc-bid-metadata", {
     hospitalName: "UNIVERSITY OF GHANA MEDICAL CENTRE LTD",
     hospitalAddress: "P. O. BOX LG 25, LEGON- ACCRA, GHANA",
     sqNumber: "RFQ/UGMC/PU/PQ/GDS/SCRB/58/2026",
     date: "2026-05-08",
     title: "SUPPLY OF SCRUBS",
+    itemName: "SCRUBS",
     deliveryTerms: "IMMEDIATELY AFTER ORDER CONFIRMATION",
     validityTerms: "90 DAYS",
     paymentTerms: "WITHIN 30 DAYS",
   });
 
-  // Excel Row Management matching input arrays
-  const [items, setItems] = useState<LineItem[]>([
+  // 2. Excel Row Management matching your input arrays
+  const [items, setItems] = usePersistentState("bc-bid-items", [
     {
       id: "1",
-      description: "ITEM 1 NAME",
+      description: "SCRUBS (MEDIUM) - COLOUR: ROYAL BLUE",
       uom: "PCS",
       qty: 30,
       unitPrice: 250,
@@ -89,7 +109,7 @@ export default function BidWorkspace() {
     },
     {
       id: "2",
-      description: "ITEM 2 NAME",
+      description: "SCRUBS (LARGE) - COLOUR: ROYAL BLUE",
       uom: "PCS",
       qty: 60,
       unitPrice: 250,
@@ -97,8 +117,8 @@ export default function BidWorkspace() {
     },
   ]);
 
-  // Ghanaian Tax Profile Options
-  const [taxes, setTaxes] = useState<TaxRate[]>([
+  // 3. Ghanaian Tax Profile Options
+  const [taxes, setTaxes] = usePersistentState("bc-bid-taxes", [
     { id: "vat", name: "VAT", percentage: 20, enabled: true },
     { id: "covid", name: "COVID-19 Levy", percentage: 0, enabled: false },
   ]);
@@ -126,6 +146,39 @@ export default function BidWorkspace() {
       grandTotal: subtotal + taxAmount,
     });
   }, [items, taxes]);
+
+  /* ---------- hospital selection ---------- */
+  const handleHospitalSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value;
+
+    if (id === ADD_NEW) {
+      setSelectedHospitalId(ADD_NEW);
+      setIsAddingHospital(true);
+      setMetadata((m) => ({ ...m, hospitalName: "", hospitalAddress: "" }));
+      return;
+    }
+
+    setIsAddingHospital(false);
+    setSelectedHospitalId(id);
+    const h = hospitals.find((x) => x.id === id);
+    if (h) {
+      setMetadata((m) => ({
+        ...m,
+        hospitalName: h.name,
+        hospitalAddress: h.address,
+      }));
+    }
+  };
+
+  const handleSaveHospital = () => {
+    if (!metadata.hospitalName.trim()) {
+      alert("Enter a hospital name before saving.");
+      return;
+    }
+    const entry = addHospital(metadata.hospitalName, metadata.hospitalAddress);
+    setSelectedHospitalId(entry.id);
+    setIsAddingHospital(false);
+  };
 
   const updateItem = (id: string, key: keyof LineItem, val: any) => {
     setItems(
@@ -164,7 +217,7 @@ export default function BidWorkspace() {
       maximumFractionDigits: 2,
     });
 
-  // Send compilation bundle to Next.js API endpoint for processing
+  // 4. Send compilation bundle to Next.js API endpoint for processing
   const handleCompilePackage = async () => {
     setIsGenerating(true);
     try {
@@ -228,15 +281,25 @@ export default function BidWorkspace() {
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
           <SectionLabel>Tender details</SectionLabel>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Field label="Hospital name">
-              <input
-                type="text"
-                className={inputClass}
-                value={metadata.hospitalName}
-                onChange={(e) =>
-                  setMetadata({ ...metadata, hospitalName: e.target.value })
-                }
-              />
+            <Field label="Hospital">
+              <div className="relative">
+                <select
+                  value={selectedHospitalId}
+                  onChange={handleHospitalSelect}
+                  className={`${inputClass} cursor-pointer appearance-none pr-9`}
+                >
+                  <option value="" disabled>
+                    Select a hospital…
+                  </option>
+                  {hospitals.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.name}
+                    </option>
+                  ))}
+                  <option value={ADD_NEW}>+ Add new hospital…</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </div>
             </Field>
             <Field label="SQ number reference">
               <input
@@ -248,13 +311,16 @@ export default function BidWorkspace() {
                 }
               />
             </Field>
-            <Field label="Hospital address">
+            <Field label="Hospital name">
               <input
                 type="text"
                 className={inputClass}
-                value={metadata.hospitalAddress}
+                value={metadata.hospitalName}
                 onChange={(e) =>
-                  setMetadata({ ...metadata, hospitalAddress: e.target.value })
+                  setMetadata({ ...metadata, hospitalName: e.target.value })
+                }
+                placeholder={
+                  isAddingHospital ? "Type the new hospital name…" : undefined
                 }
               />
             </Field>
@@ -268,6 +334,51 @@ export default function BidWorkspace() {
                 }
               />
             </Field>
+            <div className="md:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Hospital address">
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={metadata.hospitalAddress}
+                  onChange={(e) =>
+                    setMetadata({
+                      ...metadata,
+                      hospitalAddress: e.target.value,
+                    })
+                  }
+                  placeholder={
+                    isAddingHospital
+                      ? "Type the new hospital address…"
+                      : undefined
+                  }
+                />
+              </Field>
+              <Field label="Item Name">
+                <input
+                  type="text"
+                  className={`${inputClass} font-mono tracking-tight`}
+                  value={metadata.itemName}
+                  onChange={(e) =>
+                    setMetadata({ ...metadata, itemName: e.target.value })
+                  }
+                />
+              </Field>
+            </div>
+
+            {isAddingHospital && (
+              <div className="flex flex-col items-start justify-between gap-3 rounded-lg border border-teal-200 bg-teal-50/60 px-4 py-3 sm:flex-row sm:items-center md:col-span-2">
+                <p className="text-xs text-slate-600">
+                  New hospital — fill in the name and address above, then save
+                  it to reuse next time.
+                </p>
+                <button
+                  onClick={handleSaveHospital}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-600/30"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Save to list
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="my-6 h-px bg-slate-100" />
@@ -323,7 +434,7 @@ export default function BidWorkspace() {
             <SectionLabel>Price schedule</SectionLabel>
             <button
               onClick={addItemRow}
-              className="mb-4 inline-flex items-center cursor-pointer gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-600/30"
+              className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-600/30"
             >
               <Plus className="h-4 w-4" /> Add item
             </button>
@@ -410,7 +521,7 @@ export default function BidWorkspace() {
                         aria-label="Remove item"
                         className="rounded-md p-1.5 text-slate-300 transition hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-300"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4 cursor-pointer" />
                       </button>
                     </td>
                   </tr>
@@ -520,7 +631,7 @@ export default function BidWorkspace() {
           <button
             onClick={handleCompilePackage}
             disabled={isGenerating}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/30 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/30 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {isGenerating ? (
               <>
