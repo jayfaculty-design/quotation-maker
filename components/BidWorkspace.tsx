@@ -301,8 +301,8 @@ export default function BidWorkspace({
                 Bid Package Studio
               </h1>
               <p className="text-[11px] text-slate-500">
-                {entity?.short ?? "BC Medicals"} · {docType?.name ?? "Quotation"}{" "}
-                assembly
+                {entity?.short ?? "BC Medicals"} ·{" "}
+                {docType?.name ?? "Quotation"} assembly
               </p>
             </div>
           </div>
@@ -390,7 +390,7 @@ export default function BidWorkspace({
                   }
                 />
               </Field>
-              <Field label="Item Name">
+              <Field label="Item Description">
                 <input
                   type="text"
                   className={`${inputClass} font-mono tracking-tight`}

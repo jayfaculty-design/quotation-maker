@@ -236,6 +236,33 @@ export async function POST(req: NextRequest) {
       outputZipEngine.file(`FINAL_${filename}`, computedBufferOutput);
     }
 
+    // Append the company's certificates (PDFs etc.) — copied verbatim, NOT run
+    // through docxtemplater. They live one level up from the doc-type folder, at
+    // public/templates/<entity>/certificates/, because the same certificates
+    // apply to every document type (quotation, proforma, tender). They land in a
+    // Certificates/ folder inside the zip, keeping their original filenames.
+    const certsDir = path.join(
+      process.cwd(),
+      "public",
+      "templates",
+      entity,
+      "certificates",
+    );
+    if (fs.existsSync(certsDir)) {
+      const certFiles = fs
+        .readdirSync(certsDir)
+        .filter((f) => !f.startsWith("~$") && !f.startsWith("."))
+        .sort();
+      for (const filename of certFiles) {
+        const certPath = path.join(certsDir, filename);
+        if (!fs.statSync(certPath).isFile()) continue;
+        outputZipEngine.file(
+          `Certificates/${filename}`,
+          fs.readFileSync(certPath),
+        );
+      }
+    }
+
     const generatedZip = await outputZipEngine.generateAsync({
       type: "uint8array",
     });
