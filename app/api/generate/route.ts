@@ -5,11 +5,23 @@ import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import JSZip from "jszip";
 import { convertAmountToWords } from "@/lib/numberToWords";
+import { getEntity } from "@/data/entities";
+import { getDocType } from "@/data/documentTypes";
 
 export async function POST(req: NextRequest) {
   try {
     const payload = await req.json();
-    const { metadata, items, financials } = payload;
+    const { metadata, items, financials, entity, docType } = payload;
+
+    if (!getEntity(entity) || !getDocType(docType)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Unknown company or document type: ${entity}/${docType}`,
+        },
+        { status: 400 },
+      );
+    }
 
     const totalInWords = convertAmountToWords(financials.grandTotal);
 
@@ -96,21 +108,39 @@ export async function POST(req: NextRequest) {
       })),
     };
 
+    // Explicit absolute base tracking path configuration
+    const templatesDir = path.join(
+      process.cwd(),
+      "public",
+      "templates",
+      entity,
+      docType,
+    );
+
+    if (!fs.existsSync(templatesDir)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `No template folder for ${entity}/${docType}. Expected: ${templatesDir}`,
+        },
+        { status: 400 },
+      );
+    }
+
     // TEMPLATE MANAGEMENT AND DOCUMENT ASSEMBLY LOGIC
-    const targetTemplates = [
-      "COVER PAGE.docx",
-      "BID FORM 1.docx",
-      "BID FORM 2.docx",
-      "PRICE SCHEDULE.docx",
-      "BID FORM 5.docx",
-      "TABLE OF CONTENTS.docx",
-      "SUB TITTLESfinal.docx",
-    ];
+    const targetTemplates = fs
+      .readdirSync(templatesDir)
+      .filter((f) => f.toLowerCase().endsWith(".docx") && !f.startsWith("~$"))
+      .sort();
+
+    if (targetTemplates.length === 0) {
+      return NextResponse.json(
+        { success: false, error: `Template folder is empty: ${templatesDir}` },
+        { status: 400 },
+      );
+    }
 
     const outputZipEngine = new JSZip();
-
-    // Explicit absolute base tracking path configuration
-    const templatesDir = path.join(process.cwd(), "public", "templates");
 
     for (const filename of targetTemplates) {
       const templateFilePath = path.join(templatesDir, filename);

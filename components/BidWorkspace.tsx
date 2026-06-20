@@ -72,8 +72,13 @@ function Field({
     </div>
   );
 }
-
-export default function BidWorkspace() {
+export default function BidWorkspace({
+  entitySlug,
+  docTypeSlug,
+}: {
+  entitySlug: string;
+  docTypeSlug: string;
+}) {
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Hospital list (seed + saved) and add helper
@@ -224,7 +229,13 @@ export default function BidWorkspace() {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ metadata, items, financials: totals }),
+        body: JSON.stringify({
+          metadata,
+          items,
+          financials: totals,
+          entity: entitySlug,
+          docType: docTypeSlug,
+        }),
       });
 
       if (!response.ok) {
