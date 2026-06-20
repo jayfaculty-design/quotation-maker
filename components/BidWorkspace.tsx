@@ -83,6 +83,10 @@ export default function BidWorkspace({
 }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [manifest, setManifest] = useState<{
+    documents: string[];
+    certificates: string[];
+  } | null>(null);
 
   // Resolve presentational identity from the slugs (validated upstream by the
   // router page). Branding + storage keys are scoped per entity/docType so each
@@ -163,6 +167,26 @@ export default function BidWorkspace({
     });
   }, [items, taxes]);
 
+  // What the assembled package will actually contain (rendered forms + the
+  // company's certificates), read from disk server-side so the count is accurate
+  // per entity rather than a hardcoded list.
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/manifest?entity=${entitySlug}&docType=${docTypeSlug}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((m) => {
+        if (active && m)
+          setManifest({
+            documents: m.documents ?? [],
+            certificates: m.certificates ?? [],
+          });
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [entitySlug, docTypeSlug]);
+
   /* ---------- hospital selection ---------- */
   const handleHospitalSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = e.target.value;
@@ -232,6 +256,17 @@ export default function BidWorkspace({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+
+  // Package summary counts — use the real on-disk manifest once loaded, falling
+  // back to the static doc list for the first paint.
+  const prettyDoc = (f: string) =>
+    f
+      .replace(/\.docx$/i, "")
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  const docNames = manifest ? manifest.documents.map(prettyDoc) : PACKAGE_DOCS;
+  const docCount = docNames.length;
+  const certCount = manifest?.certificates.length ?? 0;
 
   // 4. Send compilation bundle to Next.js API endpoint for processing
   const handleCompilePackage = async () => {
@@ -308,7 +343,8 @@ export default function BidWorkspace({
           </div>
           <div className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-500 sm:flex">
             <FileText className="h-3.5 w-3.5 text-teal-600" />
-            {PACKAGE_DOCS.length} documents
+            {docCount} doc{docCount === 1 ? "" : "s"}
+            {certCount > 0 && ` · ${certCount} cert${certCount === 1 ? "" : "s"}`}
           </div>
         </div>
       </header>
@@ -659,8 +695,11 @@ export default function BidWorkspace({
         </section>
 
         <p className="px-1 text-xs text-slate-400">
-          Package assembles {PACKAGE_DOCS.length} documents:{" "}
-          {PACKAGE_DOCS.join(", ")}.
+          Package assembles {docCount} document{docCount === 1 ? "" : "s"} (
+          {docNames.join(", ")})
+          {certCount > 0 &&
+            ` plus ${certCount} company certificate${certCount === 1 ? "" : "s"}`}
+          .
         </p>
       </main>
 
