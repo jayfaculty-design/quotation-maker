@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { useHospitals } from "@/lib/useHospitals";
 import { usePersistentState } from "@/lib/usePersistentState";
+import { getEntity } from "@/data/entities";
+import { getDocType } from "@/data/documentTypes";
 
 interface LineItem {
   id: string;
@@ -81,16 +83,23 @@ export default function BidWorkspace({
 }) {
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Resolve presentational identity from the slugs (validated upstream by the
+  // router page). Branding + storage keys are scoped per entity/docType so each
+  // company keeps its own independent draft.
+  const entity = getEntity(entitySlug);
+  const docType = getDocType(docTypeSlug);
+  const ns = (key: string) => `${entitySlug}-${docTypeSlug}-${key}`;
+
   // Hospital list (seed + saved) and add helper
   const { hospitals, addHospital } = useHospitals();
   const [selectedHospitalId, setSelectedHospitalId] = usePersistentState(
-    "bc-bid-hospital",
+    ns("hospital"),
     "ugmc",
   );
   const [isAddingHospital, setIsAddingHospital] = useState(false);
 
   // 1. Template Variables Form Setup
-  const [metadata, setMetadata] = usePersistentState("bc-bid-metadata", {
+  const [metadata, setMetadata] = usePersistentState(ns("metadata"), {
     hospitalName: "UNIVERSITY OF GHANA MEDICAL CENTRE LTD",
     hospitalAddress: "P. O. BOX LG 25, LEGON- ACCRA, GHANA",
     sqNumber: "RFQ/UGMC/PU/PQ/GDS/SCRB/58/2026",
@@ -103,7 +112,7 @@ export default function BidWorkspace({
   });
 
   // 2. Excel Row Management matching your input arrays
-  const [items, setItems] = usePersistentState("bc-bid-items", [
+  const [items, setItems] = usePersistentState(ns("items"), [
     {
       id: "1",
       description: "SCRUBS (MEDIUM) - COLOUR: ROYAL BLUE",
@@ -123,7 +132,7 @@ export default function BidWorkspace({
   ]);
 
   // 3. Ghanaian Tax Profile Options
-  const [taxes, setTaxes] = usePersistentState("bc-bid-taxes", [
+  const [taxes, setTaxes] = usePersistentState(ns("taxes"), [
     { id: "vat", name: "VAT", percentage: 20, enabled: true },
     { id: "covid", name: "COVID-19 Levy", percentage: 0, enabled: false },
   ]);
@@ -268,15 +277,19 @@ export default function BidWorkspace({
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/85 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-[13px] font-bold tracking-tight text-white">
-              BC
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[13px] font-bold tracking-tight text-white"
+              style={{ backgroundColor: entity?.accent ?? "#0f172a" }}
+            >
+              {entity?.initials ?? "BC"}
             </div>
             <div className="leading-tight">
               <h1 className="text-sm font-semibold text-slate-900">
                 Bid Package Studio
               </h1>
               <p className="text-[11px] text-slate-500">
-                BC Medicals · Tender assembly
+                {entity?.short ?? "BC Medicals"} · {docType?.name ?? "Quotation"}{" "}
+                assembly
               </p>
             </div>
           </div>

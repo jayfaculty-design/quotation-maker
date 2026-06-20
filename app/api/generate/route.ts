@@ -30,8 +30,11 @@ export async function POST(req: NextRequest) {
         v = num % 100;
       return s[(v - 20) % 10] || s[v] || s[0];
     };
+    // `<input type="date">` emits YYYY-MM-DD, which `new Date(...)` parses as
+    // UTC midnight. Read it back in UTC so the day never shifts on non-UTC
+    // (e.g. US-region / Vercel) servers.
     const d = new Date(metadata.date);
-    const day = d.getDate();
+    const day = d.getUTCDate();
     const upper = (s: string) => (s ?? "").toUpperCase();
 
     function toTitleCase(s: string): string {
@@ -67,11 +70,14 @@ export async function POST(req: NextRequest) {
       tenderTitle: metadata.title,
       dateDay: day,
       dateMonthUpper: d
-        .toLocaleDateString("en-US", { month: "long" })
+        .toLocaleDateString("en-US", { month: "long", timeZone: "UTC" })
         .toUpperCase(),
       daySuffix: ordinalSuffix(day),
-      dateMonth: d.toLocaleDateString("en-US", { month: "long" }),
-      dateYear: d.getFullYear(),
+      dateMonth: d.toLocaleDateString("en-US", {
+        month: "long",
+        timeZone: "UTC",
+      }),
+      dateYear: d.getUTCFullYear(),
       deliveryTerms: metadata.deliveryTerms,
       validityTerms: metadata.validityTerms,
       paymentTerms: metadata.paymentTerms,
@@ -211,11 +217,17 @@ export async function POST(req: NextRequest) {
       outputZipEngine.file(`FINAL_${filename}`, computedBufferOutput);
     }
 
-    const finalZipContentBuffer = await outputZipEngine.generateAsync({
-      type: "nodebuffer",
+    const generatedZip = await outputZipEngine.generateAsync({
+      type: "uint8array",
     });
 
-    return new NextResponse(finalZipContentBuffer, {
+    // Copy into a fresh Uint8Array backed by a concrete ArrayBuffer. JSZip types
+    // its output as Uint8Array<ArrayBufferLike>, which (because ArrayBufferLike
+    // admits SharedArrayBuffer) isn't assignable to NextResponse's BodyInit.
+    const responseBody = new Uint8Array(generatedZip.length);
+    responseBody.set(generatedZip);
+
+    return new NextResponse(responseBody, {
       status: 200,
       headers: {
         "Content-Type": "application/zip",
