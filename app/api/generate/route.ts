@@ -11,7 +11,7 @@ import { getDocType } from "@/data/documentTypes";
 export async function POST(req: NextRequest) {
   try {
     const payload = await req.json();
-    const { metadata, items, financials, entity, docType } = payload;
+    const { metadata, items, financials, taxes, entity, docType } = payload;
 
     if (!getEntity(entity) || !getDocType(docType)) {
       return NextResponse.json(
@@ -24,6 +24,23 @@ export async function POST(req: NextRequest) {
     }
 
     const totalInWords = convertAmountToWords(financials.grandTotal);
+
+    // One document tax row per tax actually enabled in the workspace (and with a
+    // non-zero rate). VAT-exempt quotes send no enabled taxes, so taxLines is
+    // empty and the template's {{#taxLines}} loop drops the row entirely — the
+    // figure and label always reflect what was ticked in the UI.
+    const subtotalNum = Number(financials.subtotal) || 0;
+    const taxLines = (Array.isArray(taxes) ? taxes : [])
+      .filter(
+        (t: { enabled?: boolean; percentage?: number }) =>
+          t?.enabled && Number(t.percentage) > 0,
+      )
+      .map((t: { name: string; percentage: number }) => ({
+        label: `${t.percentage}% ${t.name}`,
+        amount: (subtotalNum * (t.percentage / 100)).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+        }),
+      }));
 
     const ordinalSuffix = (num: number) => {
       const s = ["th", "st", "nd", "rd"],
@@ -81,6 +98,7 @@ export async function POST(req: NextRequest) {
       deliveryTerms: metadata.deliveryTerms,
       validityTerms: metadata.validityTerms,
       paymentTerms: metadata.paymentTerms,
+      warranty: metadata.warranty,
       itemNameUpper: upper(metadata.itemName),
       itemNameTitle: toTitleCase(metadata.itemName),
       titleUpper: upper(metadata.title),
@@ -92,6 +110,7 @@ export async function POST(req: NextRequest) {
       subTotal: financials.subtotal.toLocaleString("en-US", {
         minimumFractionDigits: 2,
       }),
+      taxLines,
       taxAmount: financials.taxAmount.toLocaleString("en-US", {
         minimumFractionDigits: 2,
       }),

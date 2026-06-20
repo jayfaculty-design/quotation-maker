@@ -9,6 +9,7 @@ export interface Entity {
   tagline: string;
   accent: string; // brand colour (hex)
   initials: string;
+  logo?: string; // path under /public; falls back to the initials badge if unset
 }
 
 export const ENTITIES: Entity[] = [
@@ -19,6 +20,7 @@ export const ENTITIES: Entity[] = [
     tagline: "Parent group — total healthcare solutions",
     accent: "#0F766E",
     initials: "BC",
+    logo: "/logos/beautiful-creations.png",
   },
   {
     slug: "bc-medicals",
@@ -27,6 +29,7 @@ export const ENTITIES: Entity[] = [
     tagline: "Total Healthcare Solutions Provider",
     accent: "#F42635",
     initials: "BM",
+    logo: "/logos/bc-medicals.png",
   },
   {
     slug: "bc-pharmaceuticals",
@@ -35,6 +38,7 @@ export const ENTITIES: Entity[] = [
     tagline: "Pharmaceutical supply & distribution",
     accent: "#1D4ED8",
     initials: "BP",
+    logo: "/logos/bc-pharmaceuticals.png",
   },
   {
     slug: "loverealm",
@@ -43,6 +47,7 @@ export const ENTITIES: Entity[] = [
     tagline: "Medical & healthcare provisioning",
     accent: "#7C3AED",
     initials: "LR",
+    logo: "/logos/loverealm.png",
   },
   {
     slug: "drug-loft",
@@ -51,6 +56,7 @@ export const ENTITIES: Entity[] = [
     tagline: "Retail & institutional pharmacy",
     accent: "#B45309",
     initials: "DL",
+    logo: "/logos/drug-loft.png",
   },
 ];
 

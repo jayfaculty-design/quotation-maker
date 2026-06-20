@@ -82,6 +82,7 @@ export default function BidWorkspace({
   docTypeSlug: string;
 }) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   // Resolve presentational identity from the slugs (validated upstream by the
   // router page). Branding + storage keys are scoped per entity/docType so each
@@ -109,6 +110,7 @@ export default function BidWorkspace({
     deliveryTerms: "IMMEDIATELY AFTER ORDER CONFIRMATION",
     validityTerms: "90 DAYS",
     paymentTerms: "WITHIN 30 DAYS",
+    warranty: "24 MONTHS",
   });
 
   // 2. Excel Row Management matching your input arrays
@@ -242,6 +244,7 @@ export default function BidWorkspace({
           metadata,
           items,
           financials: totals,
+          taxes,
           entity: entitySlug,
           docType: docTypeSlug,
         }),
@@ -277,12 +280,22 @@ export default function BidWorkspace({
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/85 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3.5">
           <div className="flex items-center gap-3">
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-[13px] font-bold tracking-tight text-white"
-              style={{ backgroundColor: entity?.accent ?? "#0f172a" }}
-            >
-              {entity?.initials ?? "BC"}
-            </div>
+            {entity?.logo && !logoError ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={entity.logo}
+                alt={`${entity.name} logo`}
+                onError={() => setLogoError(true)}
+                className="h-11 w-auto max-w-[200px] object-contain"
+              />
+            ) : (
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-[13px] font-bold tracking-tight text-white"
+                style={{ backgroundColor: entity?.accent ?? "#0f172a" }}
+              >
+                {entity?.initials ?? "BC"}
+              </div>
+            )}
             <div className="leading-tight">
               <h1 className="text-sm font-semibold text-slate-900">
                 Bid Package Studio
@@ -446,6 +459,16 @@ export default function BidWorkspace({
                 value={metadata.paymentTerms}
                 onChange={(e) =>
                   setMetadata({ ...metadata, paymentTerms: e.target.value })
+                }
+              />
+            </Field>
+            <Field label="Warranty">
+              <input
+                type="text"
+                className={inputClass}
+                value={metadata.warranty}
+                onChange={(e) =>
+                  setMetadata({ ...metadata, warranty: e.target.value })
                 }
               />
             </Field>
