@@ -41,6 +41,7 @@ data/
 lib/
   useHospitals.ts               Seed hospitals merged with localStorage additions
   usePersistentState.ts         useState that persists to localStorage (hydration-safe)
+  useAssemblies.ts              Saved assemblies per entity+docType (recent list, reopen/edit)
   numberToWords.ts              Amount-in-words for grand total
 components/
   BidWorkspace.tsx              The quotation workspace — entity-aware (serves all 5)

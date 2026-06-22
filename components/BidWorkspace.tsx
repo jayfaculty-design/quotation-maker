@@ -8,9 +8,13 @@ import {
   Loader2,
   FileText,
   ChevronDown,
+  Save,
+  History,
+  Pencil,
 } from "lucide-react";
 import { useHospitals } from "@/lib/useHospitals";
 import { usePersistentState } from "@/lib/usePersistentState";
+import { useAssemblies, type SavedAssembly } from "@/lib/useAssemblies";
 import { getEntity } from "@/data/entities";
 import { getDocType } from "@/data/documentTypes";
 
@@ -49,6 +53,62 @@ const PACKAGE_DOCS = [
 ];
 
 const ADD_NEW = "__add__";
+
+/* ---------- workspace defaults (also used to start a fresh assembly) ---------- */
+const DEFAULT_METADATA = {
+  hospitalName: "UNIVERSITY OF GHANA MEDICAL CENTRE LTD",
+  hospitalAddress: "P. O. BOX LG 25, LEGON- ACCRA, GHANA",
+  sqNumber: "RFQ/UGMC/PU/PQ/GDS/SCRB/58/2026",
+  date: "2026-05-08",
+  title: "SUPPLY OF SCRUBS",
+  itemName: "SCRUBS",
+  deliveryTerms: "IMMEDIATELY AFTER ORDER CONFIRMATION",
+  validityTerms: "90 DAYS",
+  paymentTerms: "WITHIN 30 DAYS",
+  warranty: "24 MONTHS",
+};
+const DEFAULT_ITEMS: LineItem[] = [
+  {
+    id: "1",
+    description: "SCRUBS (MEDIUM) - COLOUR: ROYAL BLUE",
+    uom: "PCS",
+    qty: 30,
+    unitPrice: 250,
+    totalPrice: 7500,
+  },
+  {
+    id: "2",
+    description: "SCRUBS (LARGE) - COLOUR: ROYAL BLUE",
+    uom: "PCS",
+    qty: 60,
+    unitPrice: 250,
+    totalPrice: 15000,
+  },
+];
+const DEFAULT_TAXES: TaxRate[] = [
+  { id: "vat", name: "VAT", percentage: 20, enabled: true },
+];
+const DEFAULT_DISCOUNT = { percentage: 0, enabled: false };
+
+/* A saved assembly captures the whole workspace input. */
+type DraftSnapshot = {
+  metadata: typeof DEFAULT_METADATA;
+  items: LineItem[];
+  taxes: TaxRate[];
+  discount: typeof DEFAULT_DISCOUNT;
+};
+
+function timeAgo(ts: number): string {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return "just now";
+  const m = Math.floor(diff / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(ts).toLocaleDateString();
+}
 
 /* ---------- small presentational helpers ---------- */
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -119,50 +179,35 @@ export default function BidWorkspace({
   const [isAddingHospital, setIsAddingHospital] = useState(false);
 
   // 1. Template Variables Form Setup
-  const [metadata, setMetadata] = usePersistentState(ns("metadata"), {
-    hospitalName: "UNIVERSITY OF GHANA MEDICAL CENTRE LTD",
-    hospitalAddress: "P. O. BOX LG 25, LEGON- ACCRA, GHANA",
-    sqNumber: "RFQ/UGMC/PU/PQ/GDS/SCRB/58/2026",
-    date: "2026-05-08",
-    title: "SUPPLY OF SCRUBS",
-    itemName: "SCRUBS",
-    deliveryTerms: "IMMEDIATELY AFTER ORDER CONFIRMATION",
-    validityTerms: "90 DAYS",
-    paymentTerms: "WITHIN 30 DAYS",
-    warranty: "24 MONTHS",
-  });
+  const [metadata, setMetadata] = usePersistentState(
+    ns("metadata"),
+    DEFAULT_METADATA,
+  );
 
   // 2. Excel Row Management matching your input arrays
-  const [items, setItems] = usePersistentState<LineItem[]>(ns("items"), [
-    {
-      id: "1",
-      description: "SCRUBS (MEDIUM) - COLOUR: ROYAL BLUE",
-      uom: "PCS",
-      qty: 30,
-      unitPrice: 250,
-      totalPrice: 7500,
-    },
-    {
-      id: "2",
-      description: "SCRUBS (LARGE) - COLOUR: ROYAL BLUE",
-      uom: "PCS",
-      qty: 60,
-      unitPrice: 250,
-      totalPrice: 15000,
-    },
-  ]);
+  const [items, setItems] = usePersistentState<LineItem[]>(
+    ns("items"),
+    DEFAULT_ITEMS,
+  );
 
   // 3. Ghanaian Tax Profile Options
-  const [taxes, setTaxes] = usePersistentState(ns("taxes"), [
-    { id: "vat", name: "VAT", percentage: 20, enabled: true },
-  ]);
+  const [taxes, setTaxes] = usePersistentState(ns("taxes"), DEFAULT_TAXES);
 
   // Optional percentage discount applied to the subtotal (a deduction, unlike a
   // tax which adds). Off by default.
-  const [discount, setDiscount] = usePersistentState(ns("discount"), {
-    percentage: 0,
-    enabled: false,
-  });
+  const [discount, setDiscount] = usePersistentState(
+    ns("discount"),
+    DEFAULT_DISCOUNT,
+  );
+
+  // Saved assemblies for this entity + document type, plus which one (if any)
+  // is currently being edited so re-assembling updates it instead of forking.
+  const { assemblies, saveAssembly, removeAssembly } =
+    useAssemblies<DraftSnapshot>(entitySlug, docTypeSlug);
+  const [currentAssemblyId, setCurrentAssemblyId] = usePersistentState<
+    string | null
+  >(ns("current-assembly"), null);
+  const currentAssembly = assemblies.find((a) => a.id === currentAssemblyId);
 
   const [totals, setTotals] = useState({
     subtotal: 0,
@@ -304,6 +349,45 @@ export default function BidWorkspace({
   const docCount = docNames.length;
   const certCount = manifest?.certificates.length ?? 0;
 
+  /* ---------- recent assemblies ---------- */
+  const snapshot = (): DraftSnapshot => ({ metadata, items, taxes, discount });
+
+  // Manual save (without generating) — checkpoint the current inputs.
+  const saveDraft = () => {
+    const id = saveAssembly(snapshot(), currentAssemblyId);
+    setCurrentAssemblyId(id);
+  };
+
+  // Reopen a saved assembly into the form for editing.
+  const loadAssembly = (a: SavedAssembly<DraftSnapshot>) => {
+    setMetadata(a.data.metadata);
+    setItems(a.data.items);
+    setTaxes(a.data.taxes);
+    setDiscount(a.data.discount ?? DEFAULT_DISCOUNT);
+    setCurrentAssemblyId(a.id);
+    setIsAddingHospital(false);
+    const h = hospitals.find((x) => x.name === a.data.metadata.hospitalName);
+    if (h) setSelectedHospitalId(h.id);
+    if (typeof window !== "undefined")
+      window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Start a fresh assembly from the defaults.
+  const startNewAssembly = () => {
+    setMetadata(DEFAULT_METADATA);
+    setItems(DEFAULT_ITEMS);
+    setTaxes(DEFAULT_TAXES);
+    setDiscount(DEFAULT_DISCOUNT);
+    setCurrentAssemblyId(null);
+    if (typeof window !== "undefined")
+      window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const deleteAssembly = (id: string) => {
+    removeAssembly(id);
+    if (id === currentAssemblyId) setCurrentAssemblyId(null);
+  };
+
   // 4. Send compilation bundle to Next.js API endpoint for processing
   const handleCompilePackage = async () => {
     setIsGenerating(true);
@@ -338,6 +422,10 @@ export default function BidWorkspace({
       linkAnchor.click();
       linkAnchor.remove();
       window.URL.revokeObjectURL(downloadUrl);
+
+      // Save (or update) this assembly so it can be reopened and edited later.
+      const savedId = saveAssembly(snapshot(), currentAssemblyId);
+      setCurrentAssemblyId(savedId);
     } catch (error: any) {
       console.error("❌ Document assembly fault:", error.message);
       alert(error.message);
@@ -400,6 +488,112 @@ export default function BidWorkspace({
       </header>
 
       <main className="mx-auto max-w-5xl space-y-6 px-5 pb-32 pt-7">
+        {/* ---------- Recent assemblies ---------- */}
+        <section className={`${glassPanel} p-5`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-teal-600" />
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Recent assemblies
+              </span>
+              {assemblies.length > 0 && (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                  {assemblies.length}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={saveDraft}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+              >
+                <Save className="h-3.5 w-3.5" /> Save draft
+              </button>
+              {currentAssemblyId && (
+                <button
+                  onClick={startNewAssembly}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-teal-700"
+                >
+                  <Plus className="h-3.5 w-3.5" /> New
+                </button>
+              )}
+            </div>
+          </div>
+
+          {currentAssembly && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-teal-200 bg-teal-50/60 px-3 py-2 text-xs text-teal-800">
+              <Pencil className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Editing{" "}
+                <span className="font-mono font-semibold">
+                  {currentAssembly.data.metadata.sqNumber || "Untitled"}
+                </span>{" "}
+                — re-assembling (or Save draft) updates it. Use{" "}
+                <span className="font-semibold">New</span> to start a fresh one.
+              </span>
+            </div>
+          )}
+
+          {assemblies.length === 0 ? (
+            <p className="mt-3 text-xs text-slate-400">
+              Assemble a package — or Save draft — and it&apos;ll appear here so
+              you can reopen and edit it later.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {assemblies.map((a) => {
+                const active = a.id === currentAssemblyId;
+                const m = a.data.metadata;
+                const subtitle = m.title || m.itemName;
+                return (
+                  <li
+                    key={a.id}
+                    className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 transition ${
+                      active
+                        ? "border-teal-300 bg-teal-50/50"
+                        : "border-slate-200 bg-white/70 hover:border-slate-300"
+                    }`}
+                  >
+                    <button
+                      onClick={() => loadAssembly(a)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <p className="truncate font-mono text-sm font-semibold text-slate-900">
+                        {m.sqNumber || "Untitled assembly"}
+                      </p>
+                      <p className="truncate text-xs text-slate-500">
+                        {subtitle ? `${subtitle} · ` : ""}
+                        {m.hospitalName}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        {a.data.items.length} item
+                        {a.data.items.length === 1 ? "" : "s"} · saved{" "}
+                        {timeAgo(a.savedAt)}
+                        {active ? " · editing" : ""}
+                      </p>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => loadAssembly(a)}
+                        className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800"
+                      >
+                        Open
+                      </button>
+                      <button
+                        onClick={() => deleteAssembly(a.id)}
+                        aria-label="Delete assembly"
+                        className="rounded-md p-1.5 text-slate-300 transition hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
         {/* ---------- Tender / Invoice details ---------- */}
         <section className={`${glassPanel} p-6`}>
           <SectionLabel>
