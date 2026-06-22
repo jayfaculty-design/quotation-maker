@@ -100,6 +100,13 @@ export default function BidWorkspace({
   // and hides the irrelevant sections for it.
   const isProforma = docTypeSlug === "proforma";
   const isTender = docTypeSlug === "tender";
+  // The buying party: a hospital for a quotation, the consignee on a proforma
+  // invoice, the procuring entity on a tender.
+  const partyLabel = isProforma
+    ? "Consignee"
+    : isTender
+      ? "Procuring entity"
+      : "Hospital";
 
   // Hospital list (seed + saved) and add helper
   const { hospitals, addHospital } = useHospitals();
@@ -384,7 +391,7 @@ export default function BidWorkspace({
             {isProforma ? "Invoice details" : "Tender details"}
           </SectionLabel>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Field label={isProforma ? "Consignee" : "Hospital"}>
+            <Field label={partyLabel}>
               <div className="relative">
                 <select
                   value={selectedHospitalId}
@@ -422,7 +429,7 @@ export default function BidWorkspace({
                 }
               />
             </Field>
-            <Field label={isProforma ? "Consignee name" : "Hospital name"}>
+            <Field label={`${partyLabel} name`}>
               <input
                 type="text"
                 className={inputClass}
@@ -448,7 +455,7 @@ export default function BidWorkspace({
               </Field>
             )}
             <div className="md:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label={isProforma ? "Consignee address" : "Hospital address"}>
+              <Field label={`${partyLabel} address`}>
                 <input
                   type="text"
                   className={inputClass}
