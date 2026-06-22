@@ -50,10 +50,8 @@ const AVAILABILITY: Record<string, string[]> = {
     "loverealm",
     "drug-loft",
   ],
-  // beautiful-creations & drug-loft proforma templates carry VAT (and drug-loft
-  // adds brand/country columns) — they need the tax/columns decision before they
-  // can go live, so only the two no-tax invoices are wired up for now.
-  proforma: ["bc-medicals", "loverealm"],
+  // bc-pharmaceuticals has no proforma template yet; the other four are live.
+  proforma: ["beautiful-creations", "bc-medicals", "loverealm", "drug-loft"],
   // tender: not built for any entity yet
 };
 

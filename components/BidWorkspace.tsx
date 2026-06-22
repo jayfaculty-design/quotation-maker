@@ -21,6 +21,10 @@ interface LineItem {
   qty: number;
   unitPrice: number;
   totalPrice: number;
+  // Only used by templates that ask for them (e.g. drug-loft's proforma, which
+  // has BRAND and COUNTRY OF ORIGIN columns). Optional everywhere else.
+  brand?: string;
+  country?: string;
 }
 
 interface TaxRate {
@@ -99,6 +103,9 @@ export default function BidWorkspace({
   // delivery/validity/payment/warranty terms — the workspace adapts its labels
   // and hides the irrelevant sections for it.
   const isProforma = docTypeSlug === "proforma";
+  // Brand + Country-of-origin columns only matter for drug-loft's proforma,
+  // whose template has those columns. Hidden everywhere else.
+  const showBrandCountry = isProforma && entitySlug === "drug-loft";
 
   // Hospital list (seed + saved) and add helper
   const { hospitals, addHospital } = useHospitals();
@@ -123,7 +130,7 @@ export default function BidWorkspace({
   });
 
   // 2. Excel Row Management matching your input arrays
-  const [items, setItems] = usePersistentState(ns("items"), [
+  const [items, setItems] = usePersistentState<LineItem[]>(ns("items"), [
     {
       id: "1",
       description: "SCRUBS (MEDIUM) - COLOUR: ROYAL BLUE",
@@ -163,16 +170,14 @@ export default function BidWorkspace({
     const activeTaxRate = taxes
       .filter((t) => t.enabled)
       .reduce((sum, t) => sum + t.percentage, 0);
-    // Proforma invoices show only a TOTAL AMOUNT (no VAT line), so tax never
-    // applies — otherwise the default-enabled VAT would silently inflate it.
-    const taxAmount = isProforma ? 0 : subtotal * (activeTaxRate / 100);
+    const taxAmount = subtotal * (activeTaxRate / 100);
 
     setTotals({
       subtotal,
       taxAmount,
       grandTotal: subtotal + taxAmount,
     });
-  }, [items, taxes, isProforma]);
+  }, [items, taxes]);
 
   // What the assembled package will actually contain (rendered forms + the
   // company's certificates), read from disk server-side so the count is accurate
@@ -286,7 +291,7 @@ export default function BidWorkspace({
           metadata,
           items,
           financials: totals,
-          taxes: isProforma ? [] : taxes,
+          taxes,
           entity: entitySlug,
           docType: docTypeSlug,
         }),
@@ -546,6 +551,12 @@ export default function BidWorkspace({
                 <tr className="border-y border-slate-100 bg-slate-50/60 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                   <th className="w-10 py-2.5 pl-6 pr-2 text-center">#</th>
                   <th className="px-3 py-2.5">Description</th>
+                  {showBrandCountry && (
+                    <>
+                      <th className="w-28 px-3 py-2.5">Brand</th>
+                      <th className="w-32 px-3 py-2.5">Country</th>
+                    </>
+                  )}
                   <th className="w-20 px-3 py-2.5 text-center">UOM</th>
                   <th className="w-24 px-3 py-2.5 text-right">Qty</th>
                   <th className="w-36 px-3 py-2.5 text-right">Unit · GH¢</th>
@@ -573,6 +584,32 @@ export default function BidWorkspace({
                         placeholder="Item description…"
                       />
                     </td>
+                    {showBrandCountry && (
+                      <>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            className={inputClass}
+                            value={item.brand ?? ""}
+                            onChange={(e) =>
+                              updateItem(item.id, "brand", e.target.value)
+                            }
+                            placeholder="Brand…"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            className={inputClass}
+                            value={item.country ?? ""}
+                            onChange={(e) =>
+                              updateItem(item.id, "country", e.target.value)
+                            }
+                            placeholder="Country…"
+                          />
+                        </td>
+                      </>
+                    )}
                     <td className="px-3 py-2">
                       <input
                         type="text"
@@ -632,11 +669,10 @@ export default function BidWorkspace({
 
           {/* ---------- Tax + totals ---------- */}
           <div className="flex flex-col gap-8 border-t border-slate-100 bg-slate-50/40 p-6 md:flex-row md:justify-between">
-            {!isProforma && (
-              <div className="w-full md:max-w-sm">
-                <SectionLabel>Tax matrix</SectionLabel>
-                <div className="space-y-2.5">
-                  {taxes.map((tax, index) => (
+            <div className="w-full md:max-w-sm">
+              <SectionLabel>Tax matrix</SectionLabel>
+              <div className="space-y-2.5">
+                {taxes.map((tax, index) => (
                   <label
                     key={tax.id}
                     className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition hover:border-slate-300"
@@ -669,10 +705,9 @@ export default function BidWorkspace({
                       <span className="text-xs text-slate-400">%</span>
                     </div>
                   </label>
-                  ))}
-                </div>
+                ))}
               </div>
-            )}
+            </div>
 
             <div className="w-full md:max-w-xs">
               <div className="space-y-2.5 text-sm">
@@ -682,25 +717,24 @@ export default function BidWorkspace({
                     GH¢ {money(totals.subtotal)}
                   </span>
                 </div>
-                {!isProforma &&
-                  taxes
-                    .filter((t) => t.enabled)
-                    .map((t) => (
-                      <div
-                        key={t.id}
-                        className="flex items-center justify-between text-slate-500"
-                      >
-                        <span>
-                          {t.name}{" "}
-                          <span className="text-slate-400">
-                            ({t.percentage}%)
-                          </span>
+                {taxes
+                  .filter((t) => t.enabled)
+                  .map((t) => (
+                    <div
+                      key={t.id}
+                      className="flex items-center justify-between text-slate-500"
+                    >
+                      <span>
+                        {t.name}{" "}
+                        <span className="text-slate-400">
+                          ({t.percentage}%)
                         </span>
-                        <span className="font-mono tabular-nums text-teal-700">
-                          GH¢ {money(totals.subtotal * (t.percentage / 100))}
-                        </span>
-                      </div>
-                    ))}
+                      </span>
+                      <span className="font-mono tabular-nums text-teal-700">
+                        GH¢ {money(totals.subtotal * (t.percentage / 100))}
+                      </span>
+                    </div>
+                  ))}
                 <div className="mt-1 flex items-center justify-between border-t border-slate-200 pt-3">
                   <span className="text-sm font-semibold text-slate-900">
                     Grand total
