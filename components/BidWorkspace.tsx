@@ -99,6 +99,7 @@ export default function BidWorkspace({
   // delivery/validity/payment/warranty terms — the workspace adapts its labels
   // and hides the irrelevant sections for it.
   const isProforma = docTypeSlug === "proforma";
+  const isTender = docTypeSlug === "tender";
 
   // Hospital list (seed + saved) and add helper
   const { hospitals, addHospital } = useHospitals();
@@ -403,7 +404,15 @@ export default function BidWorkspace({
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               </div>
             </Field>
-            <Field label={isProforma ? "Proforma number" : "SQ number reference"}>
+            <Field
+              label={
+                isProforma
+                  ? "Proforma number"
+                  : isTender
+                    ? "Tender number"
+                    : "SQ number reference"
+              }
+            >
               <input
                 type="text"
                 className={`${inputClass} font-mono tracking-tight`}
@@ -491,7 +500,15 @@ export default function BidWorkspace({
 
           <SectionLabel>{isProforma ? "Date" : "Commercial terms"}</SectionLabel>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Field label={isProforma ? "Invoice date" : "Quotation date"}>
+            <Field
+              label={
+                isProforma
+                  ? "Invoice date"
+                  : isTender
+                    ? "Tender date"
+                    : "Quotation date"
+              }
+            >
               <input
                 type="date"
                 className={`${inputClass} font-mono`}
