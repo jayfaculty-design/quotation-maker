@@ -11,7 +11,8 @@ import { getDocType } from "@/data/documentTypes";
 export async function POST(req: NextRequest) {
   try {
     const payload = await req.json();
-    const { metadata, items, financials, taxes, entity, docType } = payload;
+    const { metadata, items, financials, taxes, discount, entity, docType } =
+      payload;
 
     if (!getEntity(entity) || !getDocType(docType)) {
       return NextResponse.json(
@@ -41,6 +42,18 @@ export async function POST(req: NextRequest) {
           minimumFractionDigits: 2,
         }),
       }));
+
+    // A discount is a deduction, rendered in the same {{#taxLines}} loop with a
+    // negative amount (so the price-schedule math stays consistent without
+    // touching every template). Only when enabled with a non-zero rate.
+    const discPct = Number(discount?.percentage) || 0;
+    if (discount?.enabled && discPct > 0) {
+      const discAmount = subtotalNum * (discPct / 100);
+      taxLines.push({
+        label: `${discPct}% Discount`,
+        amount: `-${discAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      });
+    }
 
     const ordinalSuffix = (num: number) => {
       const s = ["th", "st", "nd", "rd"],

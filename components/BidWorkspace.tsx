@@ -152,12 +152,19 @@ export default function BidWorkspace({
   // 3. Ghanaian Tax Profile Options
   const [taxes, setTaxes] = usePersistentState(ns("taxes"), [
     { id: "vat", name: "VAT", percentage: 20, enabled: true },
-    { id: "covid", name: "COVID-19 Levy", percentage: 0, enabled: false },
   ]);
+
+  // Optional percentage discount applied to the subtotal (a deduction, unlike a
+  // tax which adds). Off by default.
+  const [discount, setDiscount] = usePersistentState(ns("discount"), {
+    percentage: 0,
+    enabled: false,
+  });
 
   const [totals, setTotals] = useState({
     subtotal: 0,
     taxAmount: 0,
+    discountAmount: 0,
     grandTotal: 0,
   });
 
@@ -171,13 +178,25 @@ export default function BidWorkspace({
       .filter((t) => t.enabled)
       .reduce((sum, t) => sum + t.percentage, 0);
     const taxAmount = subtotal * (activeTaxRate / 100);
+    const discountAmount = discount.enabled
+      ? subtotal * (discount.percentage / 100)
+      : 0;
 
     setTotals({
       subtotal,
       taxAmount,
-      grandTotal: subtotal + taxAmount,
+      discountAmount,
+      grandTotal: subtotal + taxAmount - discountAmount,
     });
-  }, [items, taxes]);
+  }, [items, taxes, discount]);
+
+  // One-time cleanup: drop the legacy COVID-19 Levy from any draft saved before
+  // it was replaced by the discount control.
+  useEffect(() => {
+    if (taxes.some((t) => t.id === "covid")) {
+      setTaxes(taxes.filter((t) => t.id !== "covid"));
+    }
+  }, [taxes, setTaxes]);
 
   // What the assembled package will actually contain (rendered forms + the
   // company's certificates), read from disk server-side so the count is accurate
@@ -292,6 +311,7 @@ export default function BidWorkspace({
           items,
           financials: totals,
           taxes,
+          discount,
           entity: entitySlug,
           docType: docTypeSlug,
         }),
@@ -706,6 +726,35 @@ export default function BidWorkspace({
                     </div>
                   </label>
                 ))}
+
+                {/* Discount — a deduction from the subtotal */}
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/40 px-3 py-2.5 shadow-sm transition hover:border-rose-300">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                    checked={discount.enabled}
+                    onChange={(e) =>
+                      setDiscount({ ...discount, enabled: e.target.checked })
+                    }
+                  />
+                  <span className="text-sm font-medium text-slate-700">
+                    Discount
+                  </span>
+                  <div className="ml-auto flex items-center gap-1">
+                    <input
+                      type="number"
+                      className="w-14 rounded-md border border-slate-200 px-1.5 py-0.5 text-right font-mono text-xs tabular-nums focus:border-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-600/15"
+                      value={discount.percentage}
+                      onChange={(e) =>
+                        setDiscount({
+                          ...discount,
+                          percentage: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                    />
+                    <span className="text-xs text-slate-400">%</span>
+                  </div>
+                </label>
               </div>
             </div>
 
@@ -735,6 +784,19 @@ export default function BidWorkspace({
                       </span>
                     </div>
                   ))}
+                {discount.enabled && discount.percentage > 0 && (
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span>
+                      Discount{" "}
+                      <span className="text-slate-400">
+                        ({discount.percentage}%)
+                      </span>
+                    </span>
+                    <span className="font-mono tabular-nums text-rose-600">
+                      − GH¢ {money(totals.discountAmount)}
+                    </span>
+                  </div>
+                )}
                 <div className="mt-1 flex items-center justify-between border-t border-slate-200 pt-3">
                   <span className="text-sm font-semibold text-slate-900">
                     Grand total
