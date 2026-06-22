@@ -95,6 +95,11 @@ export default function BidWorkspace({
   const docType = getDocType(docTypeSlug);
   const ns = (key: string) => `${entitySlug}-${docTypeSlug}-${key}`;
 
+  // A proforma invoice is a single document with no tax line and no
+  // delivery/validity/payment/warranty terms — the workspace adapts its labels
+  // and hides the irrelevant sections for it.
+  const isProforma = docTypeSlug === "proforma";
+
   // Hospital list (seed + saved) and add helper
   const { hospitals, addHospital } = useHospitals();
   const [selectedHospitalId, setSelectedHospitalId] = usePersistentState(
@@ -158,14 +163,16 @@ export default function BidWorkspace({
     const activeTaxRate = taxes
       .filter((t) => t.enabled)
       .reduce((sum, t) => sum + t.percentage, 0);
-    const taxAmount = subtotal * (activeTaxRate / 100);
+    // Proforma invoices show only a TOTAL AMOUNT (no VAT line), so tax never
+    // applies — otherwise the default-enabled VAT would silently inflate it.
+    const taxAmount = isProforma ? 0 : subtotal * (activeTaxRate / 100);
 
     setTotals({
       subtotal,
       taxAmount,
       grandTotal: subtotal + taxAmount,
     });
-  }, [items, taxes]);
+  }, [items, taxes, isProforma]);
 
   // What the assembled package will actually contain (rendered forms + the
   // company's certificates), read from disk server-side so the count is accurate
@@ -279,7 +286,7 @@ export default function BidWorkspace({
           metadata,
           items,
           financials: totals,
-          taxes,
+          taxes: isProforma ? [] : taxes,
           entity: entitySlug,
           docType: docTypeSlug,
         }),
@@ -296,7 +303,7 @@ export default function BidWorkspace({
       const downloadUrl = window.URL.createObjectURL(blob);
       const linkAnchor = document.createElement("a");
       linkAnchor.href = downloadUrl;
-      linkAnchor.download = `BID_PACKAGE_${metadata.sqNumber.replace(/\//g, "_")}.zip`;
+      linkAnchor.download = `${isProforma ? "PROFORMA" : "BID_PACKAGE"}_${metadata.sqNumber.replace(/\//g, "_")}.zip`;
       document.body.appendChild(linkAnchor);
       linkAnchor.click();
       linkAnchor.remove();
@@ -333,7 +340,7 @@ export default function BidWorkspace({
             )}
             <div className="leading-tight">
               <h1 className="text-sm font-semibold text-slate-900">
-                Bid Package Studio
+                {isProforma ? "Proforma Studio" : "Bid Package Studio"}
               </h1>
               <p className="text-[11px] text-slate-500">
                 {entity?.short ?? "BC Medicals"} ·{" "}
@@ -350,11 +357,13 @@ export default function BidWorkspace({
       </header>
 
       <main className="mx-auto max-w-5xl space-y-6 px-5 pb-32 pt-7">
-        {/* ---------- Tender details ---------- */}
+        {/* ---------- Tender / Invoice details ---------- */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-          <SectionLabel>Tender details</SectionLabel>
+          <SectionLabel>
+            {isProforma ? "Invoice details" : "Tender details"}
+          </SectionLabel>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Field label="Hospital">
+            <Field label={isProforma ? "Consignee" : "Hospital"}>
               <div className="relative">
                 <select
                   value={selectedHospitalId}
@@ -374,7 +383,7 @@ export default function BidWorkspace({
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               </div>
             </Field>
-            <Field label="SQ number reference">
+            <Field label={isProforma ? "Proforma number" : "SQ number reference"}>
               <input
                 type="text"
                 className={`${inputClass} font-mono tracking-tight`}
@@ -384,7 +393,7 @@ export default function BidWorkspace({
                 }
               />
             </Field>
-            <Field label="Hospital name">
+            <Field label={isProforma ? "Consignee name" : "Hospital name"}>
               <input
                 type="text"
                 className={inputClass}
@@ -393,22 +402,24 @@ export default function BidWorkspace({
                   setMetadata({ ...metadata, hospitalName: e.target.value })
                 }
                 placeholder={
-                  isAddingHospital ? "Type the new hospital name…" : undefined
+                  isAddingHospital ? "Type the new name…" : undefined
                 }
               />
             </Field>
-            <Field label="Procurement title">
-              <input
-                type="text"
-                className={inputClass}
-                value={metadata.title}
-                onChange={(e) =>
-                  setMetadata({ ...metadata, title: e.target.value })
-                }
-              />
-            </Field>
+            {!isProforma && (
+              <Field label="Procurement title">
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={metadata.title}
+                  onChange={(e) =>
+                    setMetadata({ ...metadata, title: e.target.value })
+                  }
+                />
+              </Field>
+            )}
             <div className="md:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Hospital address">
+              <Field label={isProforma ? "Consignee address" : "Hospital address"}>
                 <input
                   type="text"
                   className={inputClass}
@@ -421,21 +432,23 @@ export default function BidWorkspace({
                   }
                   placeholder={
                     isAddingHospital
-                      ? "Type the new hospital address…"
+                      ? "Type the new address…"
                       : undefined
                   }
                 />
               </Field>
-              <Field label="Item Description">
-                <input
-                  type="text"
-                  className={`${inputClass} font-mono tracking-tight`}
-                  value={metadata.itemName}
-                  onChange={(e) =>
-                    setMetadata({ ...metadata, itemName: e.target.value })
-                  }
-                />
-              </Field>
+              {!isProforma && (
+                <Field label="Item Description">
+                  <input
+                    type="text"
+                    className={`${inputClass} font-mono tracking-tight`}
+                    value={metadata.itemName}
+                    onChange={(e) =>
+                      setMetadata({ ...metadata, itemName: e.target.value })
+                    }
+                  />
+                </Field>
+              )}
             </div>
 
             {isAddingHospital && (
@@ -456,9 +469,9 @@ export default function BidWorkspace({
 
           <div className="my-6 h-px bg-slate-100" />
 
-          <SectionLabel>Commercial terms</SectionLabel>
+          <SectionLabel>{isProforma ? "Date" : "Commercial terms"}</SectionLabel>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Field label="Quotation date">
+            <Field label={isProforma ? "Invoice date" : "Quotation date"}>
               <input
                 type="date"
                 className={`${inputClass} font-mono`}
@@ -468,53 +481,57 @@ export default function BidWorkspace({
                 }
               />
             </Field>
-            <Field label="Delivery">
-              <input
-                type="text"
-                className={inputClass}
-                value={metadata.deliveryTerms}
-                onChange={(e) =>
-                  setMetadata({ ...metadata, deliveryTerms: e.target.value })
-                }
-              />
-            </Field>
-            <Field label="Validity">
-              <input
-                type="text"
-                className={inputClass}
-                value={metadata.validityTerms}
-                onChange={(e) =>
-                  setMetadata({ ...metadata, validityTerms: e.target.value })
-                }
-              />
-            </Field>
-            <Field label="Payment">
-              <input
-                type="text"
-                className={inputClass}
-                value={metadata.paymentTerms}
-                onChange={(e) =>
-                  setMetadata({ ...metadata, paymentTerms: e.target.value })
-                }
-              />
-            </Field>
-            <Field label="Warranty">
-              <input
-                type="text"
-                className={inputClass}
-                value={metadata.warranty}
-                onChange={(e) =>
-                  setMetadata({ ...metadata, warranty: e.target.value })
-                }
-              />
-            </Field>
+            {!isProforma && (
+              <>
+                <Field label="Delivery">
+                  <input
+                    type="text"
+                    className={inputClass}
+                    value={metadata.deliveryTerms}
+                    onChange={(e) =>
+                      setMetadata({ ...metadata, deliveryTerms: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="Validity">
+                  <input
+                    type="text"
+                    className={inputClass}
+                    value={metadata.validityTerms}
+                    onChange={(e) =>
+                      setMetadata({ ...metadata, validityTerms: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="Payment">
+                  <input
+                    type="text"
+                    className={inputClass}
+                    value={metadata.paymentTerms}
+                    onChange={(e) =>
+                      setMetadata({ ...metadata, paymentTerms: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="Warranty">
+                  <input
+                    type="text"
+                    className={inputClass}
+                    value={metadata.warranty}
+                    onChange={(e) =>
+                      setMetadata({ ...metadata, warranty: e.target.value })
+                    }
+                  />
+                </Field>
+              </>
+            )}
           </div>
         </section>
 
         {/* ---------- Price schedule ---------- */}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
           <div className="flex items-center justify-between gap-3 px-6 pt-6">
-            <SectionLabel>Price schedule</SectionLabel>
+            <SectionLabel>{isProforma ? "Line items" : "Price schedule"}</SectionLabel>
             <button
               onClick={addItemRow}
               className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-600/30"
@@ -615,10 +632,11 @@ export default function BidWorkspace({
 
           {/* ---------- Tax + totals ---------- */}
           <div className="flex flex-col gap-8 border-t border-slate-100 bg-slate-50/40 p-6 md:flex-row md:justify-between">
-            <div className="w-full md:max-w-sm">
-              <SectionLabel>Tax matrix</SectionLabel>
-              <div className="space-y-2.5">
-                {taxes.map((tax, index) => (
+            {!isProforma && (
+              <div className="w-full md:max-w-sm">
+                <SectionLabel>Tax matrix</SectionLabel>
+                <div className="space-y-2.5">
+                  {taxes.map((tax, index) => (
                   <label
                     key={tax.id}
                     className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition hover:border-slate-300"
@@ -651,9 +669,10 @@ export default function BidWorkspace({
                       <span className="text-xs text-slate-400">%</span>
                     </div>
                   </label>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="w-full md:max-w-xs">
               <div className="space-y-2.5 text-sm">
@@ -663,24 +682,25 @@ export default function BidWorkspace({
                     GH¢ {money(totals.subtotal)}
                   </span>
                 </div>
-                {taxes
-                  .filter((t) => t.enabled)
-                  .map((t) => (
-                    <div
-                      key={t.id}
-                      className="flex items-center justify-between text-slate-500"
-                    >
-                      <span>
-                        {t.name}{" "}
-                        <span className="text-slate-400">
-                          ({t.percentage}%)
+                {!isProforma &&
+                  taxes
+                    .filter((t) => t.enabled)
+                    .map((t) => (
+                      <div
+                        key={t.id}
+                        className="flex items-center justify-between text-slate-500"
+                      >
+                        <span>
+                          {t.name}{" "}
+                          <span className="text-slate-400">
+                            ({t.percentage}%)
+                          </span>
                         </span>
-                      </span>
-                      <span className="font-mono tabular-nums text-teal-700">
-                        GH¢ {money(totals.subtotal * (t.percentage / 100))}
-                      </span>
-                    </div>
-                  ))}
+                        <span className="font-mono tabular-nums text-teal-700">
+                          GH¢ {money(totals.subtotal * (t.percentage / 100))}
+                        </span>
+                      </div>
+                    ))}
                 <div className="mt-1 flex items-center justify-between border-t border-slate-200 pt-3">
                   <span className="text-sm font-semibold text-slate-900">
                     Grand total
@@ -725,7 +745,8 @@ export default function BidWorkspace({
               </>
             ) : (
               <>
-                <FileDown className="h-4 w-4" /> Assemble bid package
+                <FileDown className="h-4 w-4" />{" "}
+                {isProforma ? "Generate proforma" : "Assemble bid package"}
               </>
             )}
           </button>

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getEntity } from "@/data/entities";
-import { getDocType } from "@/data/documentTypes";
+import { getDocType, isDocTypeAvailable } from "@/data/documentTypes";
 import BidWorkspace from "@/components/BidWorkspace";
 
 export default async function WorkspacePage({
@@ -16,8 +16,8 @@ export default async function WorkspacePage({
   const docType = getDocType(dSlug);
   if (!entity || !docType) notFound();
 
-  // Gate anything not yet live.
-  if (docType.status !== "available") {
+  // Gate anything not live for this specific entity.
+  if (!isDocTypeAvailable(entity.slug, docType.slug)) {
     return (
       <ComingSoon
         entityName={entity.name}
@@ -27,13 +27,14 @@ export default async function WorkspacePage({
     );
   }
 
-  // Route to the correct preparation system.
+  // Route to the correct preparation system. Quotation and proforma share the
+  // entity-aware BidWorkspace (it adapts its labels/fields to the doc type).
   switch (docType.slug) {
     case "quotation":
+    case "proforma":
       return (
         <BidWorkspace entitySlug={entity.slug} docTypeSlug={docType.slug} />
       );
-    // case "proforma": return <ProformaWorkspace entity={entity} />;
     // case "tender":   return <TenderWorkspace entity={entity} />;
     default:
       return (

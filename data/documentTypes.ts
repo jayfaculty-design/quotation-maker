@@ -38,9 +38,26 @@ export const DOC_TYPES: DocType[] = [
 export const getDocType = (slug: string): DocType | undefined =>
   DOC_TYPES.find((d) => d.slug === slug);
 
-// Per-entity availability later, e.g.:
-//   export const AVAILABILITY: Record<string, string[]> = {
-//     "beautiful-creations": ["quotation"],
-//     "bc-medicals": [],
-//   };
-// then check AVAILABILITY[entitySlug]?.includes(docTypeSlug) instead of status.
+// Per-entity availability. `status` above is only a coarse default/label now;
+// what's actually live is gated here, because a document type can be ready for
+// some entities but not others (e.g. proforma exists for every entity except
+// bc-pharmaceuticals, whose template hasn't been added yet).
+const AVAILABILITY: Record<string, string[]> = {
+  quotation: [
+    "beautiful-creations",
+    "bc-medicals",
+    "bc-pharmaceuticals",
+    "loverealm",
+    "drug-loft",
+  ],
+  // beautiful-creations & drug-loft proforma templates carry VAT (and drug-loft
+  // adds brand/country columns) — they need the tax/columns decision before they
+  // can go live, so only the two no-tax invoices are wired up for now.
+  proforma: ["bc-medicals", "loverealm"],
+  // tender: not built for any entity yet
+};
+
+export const isDocTypeAvailable = (
+  entitySlug: string,
+  docTypeSlug: string,
+): boolean => (AVAILABILITY[docTypeSlug] ?? []).includes(entitySlug);

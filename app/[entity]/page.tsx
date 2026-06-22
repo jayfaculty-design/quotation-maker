@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ChevronRight, Lock } from "lucide-react";
 import { getEntity } from "@/data/entities";
-import { DOC_TYPES } from "@/data/documentTypes";
+import { DOC_TYPES, isDocTypeAvailable } from "@/data/documentTypes";
 
 export default async function EntityPage({
   params,
@@ -47,7 +47,7 @@ export default async function EntityPage({
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {DOC_TYPES.map((d) => {
-            const available = d.status === "available";
+            const available = isDocTypeAvailable(entity.slug, d.slug);
             const card = (
               <div
                 className={`flex h-full flex-col rounded-2xl border bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ${
