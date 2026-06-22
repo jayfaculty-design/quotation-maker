@@ -7,7 +7,7 @@ five Ghanaian healthcare companies under the Beautiful Creations group.
 > Companion docs: `CLAUDE.md` (conventions, docxtemplater rules, gotchas) is the
 > authoritative reference. This file tracks **what's built and what's left**.
 
-_Last updated: 2026-06-22 · branch `main` (20 commits ahead of `origin/main`, nothing pushed)._
+_Last updated: 2026-06-22 · branch `main`._
 
 ---
 
@@ -32,7 +32,7 @@ app/
   api/generate/route.ts         Reads templates, renders, bundles certificates, returns .zip
   api/manifest/route.ts         GET → real per-entity {documents[], certificates[]} counts
 components/
-  Landing.tsx                   NEW — premium SaaS landing page (client; hero, stats, cards, features, trust, footer)
+  Landing.tsx                   Internal landing page (client; hero, company cards, slim footer)
   BidWorkspace.tsx              The live prep workspace — entity-aware, serves all 3 doc types
 data/
   entities.ts                   5 companies (slug, name, short, tagline, accent, initials, logo)
@@ -41,6 +41,7 @@ data/
 lib/
   useHospitals.ts               Seed hospitals merged with localStorage additions
   usePersistentState.ts         Hydration-safe persisted useState (gated by `loaded` flag)
+  useAssemblies.ts              Saved assemblies per entity+docType (recent list, reopen/edit)
   numberToWords.ts              Amount-in-words for grand total
 public/
   logos/<entity>.png            5 entity logos (all present)
@@ -74,37 +75,41 @@ public/
 
 | Entity | Quotation | Proforma | Tender |
 |---|---|---|---|
-| beautiful-creations | ✅ live (7 docx) | ✅ live (1) | ⚠️ templates present (10), **not wired** |
+| beautiful-creations | ✅ live (7 docx) | ✅ live (1) | ✅ live (10 docx, GH¢) |
 | bc-medicals | ✅ live (7) | ✅ live (1) | ❌ no templates |
 | bc-pharmaceuticals | ✅ live (7) | ❌ no template | ❌ no templates |
-| loverealm | ✅ live (7) | ✅ live (1) | ⚠️ templates present (12), **not wired** |
+| loverealm | ✅ live (7) | ✅ live (1) | ✅ live (12 docx, GH¢) |
 | drug-loft | ✅ live (6) | ✅ live (1) | ✅ live (12 docx, GH¢) |
 
 Certificates: 4–5 PDFs per entity, all present, bundled into quotation/tender packages.
+
+**Recent assemblies** (`lib/useAssemblies.ts`): every workspace snapshots its inputs to
+localStorage (per entity+docType) on assemble or "Save draft", so a quotation/proforma/tender
+can be reopened and edited later. Browser-local only — not synced across devices/users.
 
 ---
 
 ## What still needs to be done
 
-1. **Wire up the remaining tenders** (the main open task — see plan
-   `~/.claude/plans/swirling-hopping-muffin.md`):
-   - **loverealm tender** (GH¢, fits the data model) — templatize its 12 `.docx`, add to
-     `AVAILABILITY.tender`. _User direction: one entity, then check in._
-   - **beautiful-creations tender** (GH¢) — templatize its 10 `.docx`, add to availability.
-   - Templates exist but currently have **0 placeholders** + hardcoded sample data
-     (ST. LUKE'S / GHS / SQ fragments) — reuse the quotation/proforma toolkit
-     (`dxedit`/`replace_span`, table-loop collapse, two-cell conditional-tax row, strip `numPr`).
-   - Move the Manufacturer's Authorization docs (in `tender/AUTHORISATION|DECLARATION|MA/`
-     subfolders) up to the top-level `tender/` folder so the route bundles them.
-2. **Two legacy TOC `.doc` files** (beautiful-creations + loverealm tender) — wire up once the
-   user converts them to `.docx`.
+1. **Decision: should saved assemblies outlive the browser?** `useAssemblies` is localStorage-only,
+   so saved packages don't survive a cache-clear and don't sync across devices/staff. Reliable
+   cross-device "save for later" needs a backend (DB + object storage), not just local FS — a real
+   feature to scope if wanted.
+2. **bc-medicals / bc-pharmaceuticals tender** — no templates provided; stay "Coming soon".
 3. **bc-pharmaceuticals proforma** — no template yet (intentionally excluded from availability).
-4. **bc-medicals / bc-pharmaceuticals tender** — no templates; stay "Coming soon".
-5. **Six-year document archive** (search/retrieval) — not started.
-6. **Optional polish** — lighter glassmorphism pass on the BidWorkspace itself to match the new
-   landing/picker design language.
-7. **Content review** — "TenderSuite" product name and the illustrative hero/stat figures
-   (Active Tenders, Submitted Bids, Success Rate) are placeholders pending the user's call.
+4. **Six-year document archive** (search/retrieval) — not started.
+5. **Content / naming** — "TenderSuite" is a placeholder product name (used in nav/footer); rename
+   to whatever the group prefers. Landing page was trimmed to internal essentials (fabricated SaaS
+   stats / testimonial / "trusted by" pills removed).
+6. **Nice-to-have** — a combined "recent assemblies across all companies" view (currently scoped
+   per workspace).
+
+### Done since first draft of this file
+- Tender brought live for **drug-loft, loverealm, beautiful-creations** (incl. collapsing
+  beautiful-creations' multi-LOT price schedule to a single dynamic loop table).
+- Landing page redesigned (glassmorphism) then **trimmed to internal essentials**; document-type
+  picker and the BidWorkspace given a matching glass polish pass.
+- **Recent assemblies** save/reopen/edit feature added to every workspace.
 
 ### Deployment note
 Filesystem template reads work in dev and on persistent-disk servers. Vercel serverless can
