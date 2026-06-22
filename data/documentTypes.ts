@@ -52,9 +52,9 @@ const AVAILABILITY: Record<string, string[]> = {
   ],
   // bc-pharmaceuticals has no proforma template yet; the other four are live.
   proforma: ["beautiful-creations", "bc-medicals", "loverealm", "drug-loft"],
-  // tender: drug-loft templatized & live; beautiful-creations + loverealm
+  // tender: drug-loft + loverealm templatized & live; beautiful-creations
   // templates provided but not yet wired up.
-  tender: ["drug-loft"],
+  tender: ["drug-loft", "loverealm"],
 };
 
 export const isDocTypeAvailable = (
