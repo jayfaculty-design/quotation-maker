@@ -32,10 +32,10 @@ export default async function WorkspacePage({
   switch (docType.slug) {
     case "quotation":
     case "proforma":
+    case "tender":
       return (
         <BidWorkspace entitySlug={entity.slug} docTypeSlug={docType.slug} />
       );
-    // case "tender":   return <TenderWorkspace entity={entity} />;
     default:
       return (
         <ComingSoon
