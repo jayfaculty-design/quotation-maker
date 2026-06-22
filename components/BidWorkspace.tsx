@@ -35,6 +35,8 @@ const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/15";
 const labelClass =
   "mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-slate-500";
+const glassPanel =
+  "rounded-3xl border border-white/60 bg-white/70 shadow-[0_10px_40px_-16px_rgba(2,6,23,0.18)] backdrop-blur-xl";
 
 const PACKAGE_DOCS = [
   "Cover Page",
@@ -345,9 +347,22 @@ export default function BidWorkspace({
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f7f9] font-sans text-slate-900">
+    <div className="relative min-h-screen overflow-x-hidden font-sans text-slate-900">
+      {/* ---------- ambient glass backdrop (entity-accented, subtle) ---------- */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#eef3fb] via-[#eef2f9] to-[#e9eef7]" />
+        <div
+          className="animate-blob absolute -left-32 top-[-8rem] h-[24rem] w-[24rem] rounded-full blur-3xl"
+          style={{ backgroundColor: `${entity?.accent ?? "#14b8a6"}1f` }}
+        />
+        <div
+          className="animate-blob absolute right-[-10rem] top-40 h-[22rem] w-[22rem] rounded-full bg-sky-300/20 blur-3xl"
+          style={{ animationDelay: "-8s" }}
+        />
+      </div>
+
       {/* ---------- App header ---------- */}
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/85 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-white/50 bg-white/65 backdrop-blur-xl">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3.5">
           <div className="flex items-center gap-3">
             {entity?.logo && !logoError ? (
@@ -376,7 +391,7 @@ export default function BidWorkspace({
               </p>
             </div>
           </div>
-          <div className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-500 sm:flex">
+          <div className="hidden items-center gap-1.5 rounded-full border border-white/60 bg-white/60 px-3 py-1 text-[11px] font-medium text-slate-500 backdrop-blur-md sm:flex">
             <FileText className="h-3.5 w-3.5 text-teal-600" />
             {docCount} doc{docCount === 1 ? "" : "s"}
             {certCount > 0 && ` · ${certCount} cert${certCount === 1 ? "" : "s"}`}
@@ -386,7 +401,7 @@ export default function BidWorkspace({
 
       <main className="mx-auto max-w-5xl space-y-6 px-5 pb-32 pt-7">
         {/* ---------- Tender / Invoice details ---------- */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <section className={`${glassPanel} p-6`}>
           <SectionLabel>
             {isProforma ? "Invoice details" : "Tender details"}
           </SectionLabel>
@@ -573,7 +588,7 @@ export default function BidWorkspace({
         </section>
 
         {/* ---------- Price schedule ---------- */}
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <section className={`overflow-hidden ${glassPanel}`}>
           <div className="flex items-center justify-between gap-3 px-6 pt-6">
             <SectionLabel>{isProforma ? "Line items" : "Price schedule"}</SectionLabel>
             <button
@@ -675,7 +690,7 @@ export default function BidWorkspace({
           </div>
 
           {/* ---------- Tax + totals ---------- */}
-          <div className="flex flex-col gap-8 border-t border-slate-100 bg-slate-50/40 p-6 md:flex-row md:justify-between">
+          <div className="flex flex-col gap-8 border-t border-white/60 bg-white/40 p-6 md:flex-row md:justify-between">
             <div className="w-full md:max-w-sm">
               <SectionLabel>Tax matrix</SectionLabel>
               <div className="space-y-2.5">
@@ -809,7 +824,7 @@ export default function BidWorkspace({
       </main>
 
       {/* ---------- Sticky command bar ---------- */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/90 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-white/50 bg-white/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-3.5">
           <div className="leading-tight">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
