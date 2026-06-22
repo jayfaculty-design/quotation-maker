@@ -136,8 +136,6 @@ export async function POST(req: NextRequest) {
         nums: idx + 1,
         description: item.description,
         uom: item.uom,
-        brand: item.brand ?? "",
-        country: item.country ?? "",
         qty: item.qty,
         unitPrice: item.unitPrice.toLocaleString("en-US", {
           minimumFractionDigits: 2,
