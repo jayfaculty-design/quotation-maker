@@ -43,11 +43,11 @@ export async function POST(req: NextRequest) {
         }),
       }));
 
-    // A discount is a deduction, rendered in the same {{#taxLines}} loop with a
-    // negative amount (so the price-schedule math stays consistent without
-    // touching every template). Only when enabled with a non-zero rate.
+    // A discount is a proforma-only deduction, rendered in the same {{#taxLines}}
+    // loop with a negative amount (so the totals stay consistent without touching
+    // every template). Only when enabled with a non-zero rate.
     const discPct = Number(discount?.percentage) || 0;
-    if (discount?.enabled && discPct > 0) {
+    if (docType === "proforma" && discount?.enabled && discPct > 0) {
       const discAmount = subtotalNum * (discPct / 100);
       taxLines.push({
         label: `${discPct}% Discount`,
